@@ -2,6 +2,9 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import {filterImageFromURL, deleteLocalFiles} from './util/util';
 
+
+
+
 (async () => {
 
   // Init the Express application
@@ -13,6 +16,7 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   // Use the body parser middleware for post requests
   app.use(bodyParser.json());
 
+  
   // @TODO1 IMPLEMENT A RESTFUL ENDPOINT
   // GET /filteredimage?image_url={{URL}}
   // endpoint to filter an image from a public url.
@@ -33,11 +37,47 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   
   // Root Endpoint
   // Displays a simple message to the user
-  app.get( "/", async ( req, res ) => {
-    res.send("try GET /filteredimage?image_url={{}}")
-  } );
+  app.get( "/filteredimage", async ( req, res ) => {
+    
+    //get image_url from Query
+    let{image_url} = req.query;
+    
+    
+    const util = require('util');
+    const urlExists = util.promisify(require('url-exists'));
+
+    //validate the input image URL is a working URL
+    let isWorkingURL = await urlExists(image_url); 
+    
+    //if non working URL then send error message 
+    if(!isWorkingURL)
+      res.send("Invalid image url, Please re-try with valid image URL !");
   
 
+      try
+      {
+      // filter image file 
+      let imageFile = await filterImageFromURL(image_url);
+      
+      //call clean up after finish sending response , passing the function to be executed on finish event, 
+      // it will be called automatically after finish sending response
+      res.on("finish",function()
+      {
+        deleteLocalFiles([imageFile]);
+      });
+
+      //send image file
+      res.sendfile(imageFile);
+      }
+      catch(err)
+      {
+        res.send("Image not available !" ) ;
+      }
+      
+ 
+  } );
+  
+ 
   // Start the Server
   app.listen( port, () => {
       console.log( `server running http://localhost:${ port }` );
